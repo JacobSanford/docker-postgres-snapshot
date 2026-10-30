@@ -137,7 +137,12 @@ echo -e "${GREEN}Image built${NC}"
 echo ""
 
 echo "Step 3/4: Starting PostgreSQL 17 and 18, source and restore servers..."
-docker compose up -d --wait pg17 pg18 pg17-restore pg18-restore > /dev/null
+if ! docker compose up -d --wait pg17 pg18 pg17-restore pg18-restore; then
+    echo -e "${RED}A server did not become healthy; its logs follow${NC}"
+    docker compose logs pg17 pg18 pg17-restore pg18-restore
+    docker compose down -v > /dev/null 2>&1
+    exit 1
+fi
 echo -e "${GREEN}Servers healthy${NC}"
 echo ""
 
