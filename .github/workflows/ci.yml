@@ -1,0 +1,30 @@
+name: Test and Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Setup/Validation Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Docker Compose
+      uses: docker/setup-compose-action@v1
+    - name: Run tests
+      run: cd testing && bash run-tests.sh
+
+  build-push-images:
+    name: Build and Push Image
+    needs: [tests]
+    permissions:
+      contents: read
+      packages: write
+    uses: unb-libraries/github-workflows/.github/workflows/build-push.yaml@1.x
+    with:
+      image-name: 'ghcr.io/jacobsanford/postgres-snapshot'
+    secrets:
+      GH_CONTAINER_REGISTRY_USER: ${{ github.actor }}
+      GH_CONTAINER_REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
