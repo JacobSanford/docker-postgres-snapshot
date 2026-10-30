@@ -1,0 +1,149 @@
+name: postgres-snapshot-test
+
+x-server: &server
+  environment:
+    POSTGRES_PASSWORD: rootpassword
+    POSTGRES_DB: app1
+  volumes:
+    - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  healthcheck:
+    test: ["CMD", "pg_isready", "-U", "postgres", "-d", "app1"]
+    interval: 5s
+    timeout: 5s
+    retries: 20
+
+# Empty servers that the disaster-recovery test restores into.
+x-restore-server: &restore-server
+  environment:
+    POSTGRES_PASSWORD: rootpassword
+  healthcheck:
+    test: ["CMD", "pg_isready", "-U", "postgres"]
+    interval: 5s
+    timeout: 5s
+    retries: 20
+
+# Built by run-tests.sh, never pulled.
+x-snapshot: &snapshot
+  image: postgres-snapshot:test
+  pull_policy: never
+  restart: "no"
+
+x-connection-18: &connection-18
+  DB_HOSTNAME: pg18
+  DB_USER_NAME: postgres
+  DB_USER_PASSWORD: rootpassword
+
+x-connection-17: &connection-17
+  DB_HOSTNAME: pg17
+  DB_USER_NAME: postgres
+  DB_USER_PASSWORD: rootpassword
+
+services:
+  pg17:
+    <<: *server
+    image: postgres:17-alpine
+  pg18:
+    <<: *server
+    image: postgres:18-alpine
+  pg17-restore:
+    <<: *restore-server
+    image: postgres:17-alpine
+  pg18-restore:
+    <<: *restore-server
+    image: postgres:18-alpine
+
+  # Explicit list, global structure-only tables and globals, once per server major.
+  snapshot-multiple-17:
+    <<: *snapshot
+    environment:
+      <<: *connection-17
+      DB_DATABASES: "app1,app2,app3"
+      DB_STRUCT_TABLES: "cache_*,sessions"
+      DB_SNAPSHOT_GLOBALS: "true"
+    volumes:
+      - ./snapshots/multiple-17:/data
+  snapshot-multiple-18:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app1,app2,app3"
+      DB_STRUCT_TABLES: "cache_*,sessions"
+      DB_SNAPSHOT_GLOBALS: "true"
+    volumes:
+      - ./snapshots/multiple-18:/data
+
+  # Discovery with an exclusion. The postgres database is snapshotted; app3 is not.
+  snapshot-all:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_SNAPSHOT_ALL_DATABASES: "true"
+      DB_EXCLUDE_DATABASES: "app3"
+    volumes:
+      - ./snapshots/all:/data
+
+  # Per-database structure-only tables, including a name that needs quoting.
+  snapshot-per-db:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app1,app2,Mixed-Case"
+      DB_STRUCT_TABLES_APP1: "cache_*,sessions,watchdog"
+      DB_STRUCT_TABLES_APP2: "temp_*,cache"
+      DB_STRUCT_TABLES_MIXED_CASE: "Audit Log"
+    volumes:
+      - ./snapshots/per-db:/data
+
+  # Discovery plus the pg_dumpall combined file.
+  snapshot-combined:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_SNAPSHOT_ALL_DATABASES: "true"
+      DB_SNAPSHOT_COMBINED: "true"
+      DB_EXCLUDE_DATABASES: "app3"
+    volumes:
+      - ./snapshots/combined:/data
+
+  # Rotation: only the lowest retained level (daily, since hourly is 0) dumps live data.
+  snapshot-rotation:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app1"
+      RSNAPSHOT_RETAIN_HOURLY: 0
+      RSNAPSHOT_RETAIN_DAILY: 2
+      RSNAPSHOT_RETAIN_WEEKLY: 2
+      RSNAPSHOT_RETAIN_MONTHLY: 0
+    volumes:
+      - ./snapshots/rotation:/data
+
+  # Failure: a good run, then a run with one missing database, into the same tree.
+  snapshot-failure-good:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app1"
+      RSNAPSHOT_RETAIN_HOURLY: 0
+      RSNAPSHOT_RETAIN_DAILY: 3
+    volumes:
+      - ./snapshots/failure:/data
+  snapshot-failure-bad:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app1,nosuchdb"
+      RSNAPSHOT_RETAIN_HOURLY: 0
+      RSNAPSHOT_RETAIN_DAILY: 3
+    volumes:
+      - ./snapshots/failure:/data
+
+  # Lock wait: a table held in ACCESS EXCLUSIVE mode must make the dump fail fast.
+  snapshot-lock:
+    <<: *snapshot
+    environment:
+      <<: *connection-18
+      DB_DATABASES: "app3"
+      DB_LOCK_WAIT_TIMEOUT: "2s"
+    volumes:
+      - ./snapshots/lock:/data
