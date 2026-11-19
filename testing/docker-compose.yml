@@ -35,18 +35,43 @@ x-connection-18: &connection-18
   DB_USER_NAME: postgres
   DB_USER_PASSWORD: rootpassword
 
+# No PostgreSQL 15 client is installed (Alpine has none), so this exercises the fallback to the
+# newest client.
+x-connection-15: &connection-15
+  DB_HOSTNAME: pg15
+  DB_USER_NAME: postgres
+  DB_USER_PASSWORD: rootpassword
+
+x-connection-16: &connection-16
+  DB_HOSTNAME: pg16
+  DB_USER_NAME: postgres
+  DB_USER_PASSWORD: rootpassword
+
 x-connection-17: &connection-17
   DB_HOSTNAME: pg17
   DB_USER_NAME: postgres
   DB_USER_PASSWORD: rootpassword
 
 services:
+  pg15:
+    <<: *server
+    image: postgres:15-alpine
+  pg16:
+    <<: *server
+    image: postgres:16-alpine
   pg17:
     <<: *server
     image: postgres:17-alpine
   pg18:
     <<: *server
     image: postgres:18-alpine
+  # The PostgreSQL 15 dump comes from the 18 client, so it restores into 17 or newer only.
+  pg15-upgrade:
+    <<: *restore-server
+    image: postgres:18-alpine
+  pg16-restore:
+    <<: *restore-server
+    image: postgres:16-alpine
   pg17-restore:
     <<: *restore-server
     image: postgres:17-alpine
@@ -55,6 +80,24 @@ services:
     image: postgres:18-alpine
 
   # Explicit list, global structure-only tables and globals, once per server major.
+  snapshot-multiple-15:
+    <<: *snapshot
+    environment:
+      <<: *connection-15
+      DB_DATABASES: "app1,app2,app3"
+      DB_STRUCT_TABLES: "cache_*,sessions"
+      DB_SNAPSHOT_GLOBALS: "true"
+    volumes:
+      - ./snapshots/multiple-15:/data
+  snapshot-multiple-16:
+    <<: *snapshot
+    environment:
+      <<: *connection-16
+      DB_DATABASES: "app1,app2,app3"
+      DB_STRUCT_TABLES: "cache_*,sessions"
+      DB_SNAPSHOT_GLOBALS: "true"
+    volumes:
+      - ./snapshots/multiple-16:/data
   snapshot-multiple-17:
     <<: *snapshot
     environment:

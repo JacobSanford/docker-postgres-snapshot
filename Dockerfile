@@ -31,7 +31,7 @@ ENV RSNAPSHOT_LOGLEVEL=3
 
 # One client per server major in use. snapshot.sh picks the client matching the server's major
 # version and falls back to the newest installed one. Add a major here when a server moves to it.
-RUN apk --update --no-cache add rsnapshot postgresql17-client postgresql18-client && \
+RUN apk --update --no-cache add rsnapshot postgresql16-client postgresql17-client postgresql18-client && \
   mkdir -p ${DB_DUMP_LOCATION}
 
 COPY ./build/conf/rsnapshot/rsnapshot.conf /etc/rsnapshot.conf

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Automated test runner for docker-postgres-snapshot.
-# Runs every snapshot scenario against PostgreSQL 17 and 18, then restores the dumps into empty
-# servers of the same major and checks the data.
+# Runs every snapshot scenario against PostgreSQL 17 and 18, the explicit-list scenario against
+# 16, and restores those dumps into empty servers of the same major. PostgreSQL 15 has no client
+# in the image, so it covers the fallback to the newest client and restores into 18.
 set -e
 cd "$(dirname "$0")"
 
@@ -136,10 +137,11 @@ docker build ${BUILD_NETWORK:+--network "$BUILD_NETWORK"} -t postgres-snapshot:t
 echo -e "${GREEN}Image built${NC}"
 echo ""
 
-echo "Step 3/4: Starting PostgreSQL 17 and 18, source and restore servers..."
-if ! docker compose up -d --wait pg17 pg18 pg17-restore pg18-restore; then
+echo "Step 3/4: Starting PostgreSQL 15 to 18, source and restore servers..."
+SERVERS="pg15 pg16 pg17 pg18 pg15-upgrade pg16-restore pg17-restore pg18-restore"
+if ! docker compose up -d --wait $SERVERS; then
     echo -e "${RED}A server did not become healthy; its logs follow${NC}"
-    docker compose logs pg17 pg18 pg17-restore pg18-restore
+    docker compose logs $SERVERS
     docker compose down -v > /dev/null 2>&1
     exit 1
 fi
@@ -150,6 +152,8 @@ echo "Step 4/4: Running tests..."
 echo ""
 
 # Explicit list, struct tables, globals; one run per server major.
+snapshot snapshot-multiple-15 hourly > /tmp/pgsnap-multiple-15.log 2>&1 || true
+snapshot snapshot-multiple-16 hourly > /dev/null 2>&1 || true
 snapshot snapshot-multiple-17 hourly > /dev/null 2>&1 || true
 snapshot snapshot-multiple-18 hourly > /dev/null 2>&1 || true
 snapshot snapshot-all hourly > /dev/null 2>&1 || true
@@ -157,7 +161,7 @@ snapshot snapshot-per-db hourly > /dev/null 2>&1 || true
 snapshot snapshot-combined hourly > /dev/null 2>&1 || true
 refresh_view
 
-for v in 17 18; do
+for v in 15 16 17 18; do
     D=$VIEW/multiple-$v/hourly.0/postgres
     run_test "PG$v: app1 dump" "validate_dump $D/app1.gz"
     run_test "PG$v: app2 dump" "validate_dump $D/app2.gz"
@@ -167,7 +171,11 @@ for v in 17 18; do
     run_test "PG$v: sessions is structure-only" "validate_structure_only $D/app1.gz public.sessions"
     run_test "PG$v: users keeps its data" "validate_has_data $D/app1.gz public.users"
     run_test "PG$v: globals include app_owner" "gunzip -c $D/globals.sql.gz | grep -q 'CREATE ROLE app_owner'"
-    run_test "PG$v: metadata names the matching client" "validate_metadata $D/snapshot-metadata.json $v"
+    if [ $v = 15 ]; then
+        run_test "PG15: falls back to the 18 client and warns" "validate_metadata $D/snapshot-metadata.json 18 && grep -q 'no PostgreSQL 15 client installed; using 18' /tmp/pgsnap-multiple-15.log"
+    else
+        run_test "PG$v: metadata names the matching client" "validate_metadata $D/snapshot-metadata.json $v"
+    fi
     run_test "PG$v: dump uses --clean --if-exists" "gunzip -c $D/app1.gz | grep -q 'DROP TABLE IF EXISTS public.users'"
 done
 
@@ -193,12 +201,17 @@ run_test "Combined: per-database files still written" "validate_dump $D/app1.gz"
 run_test "Snapshot files are mode 0600" "validate_private multiple-18"
 
 # Disaster recovery: empty server of the same major, globals then databases.
-for v in 17 18; do
+for v in 16 17 18; do
     D=$VIEW/multiple-$v/hourly.0/postgres
     run_test "PG$v: restore into an empty server" "restore_globals pg$v-restore $D && restore_databases pg$v-restore $D"
     run_test "PG$v: restored data, owners and extension" "validate_restored pg$v-restore"
     run_test "PG$v: restore again over the existing databases" "restore_databases pg$v-restore $D && validate_restored pg$v-restore"
 done
+
+# Fallback: the PostgreSQL 15 dump, made by the 18 client, restores into 18 (the upgrade path).
+D=$VIEW/multiple-15/hourly.0/postgres
+run_test "PG15: restore into an empty PostgreSQL 18 server" "restore_globals pg15-upgrade $D && restore_databases pg15-upgrade $D"
+run_test "PG15: restored data, owners and extension on 18" "validate_restored pg15-upgrade"
 
 # Rotation: only the lowest retained level dumps; higher levels only promote.
 R=$VIEW/rotation
