@@ -6,8 +6,10 @@ x-server: &server
     POSTGRES_DB: app1
   volumes:
     - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  # Over TCP, as the snapshot containers connect. While init-db.sql runs, the entrypoint's
+  # temporary server listens on the Unix socket only, so a socket check passes too early.
   healthcheck:
-    test: ["CMD", "pg_isready", "-U", "postgres", "-d", "app1"]
+    test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "app1"]
     interval: 5s
     timeout: 5s
     retries: 20
@@ -17,7 +19,7 @@ x-restore-server: &restore-server
   environment:
     POSTGRES_PASSWORD: rootpassword
   healthcheck:
-    test: ["CMD", "pg_isready", "-U", "postgres"]
+    test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
     interval: 5s
     timeout: 5s
     retries: 20
