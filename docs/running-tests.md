@@ -27,7 +27,7 @@ The runner:
 
 1. Removes old containers and snapshots
 2. Builds the image as `postgres-snapshot:test`
-3. Starts PostgreSQL 17 and 18 seeded from `init-db.sql`, plus an empty server of each version for restores
+3. Starts PostgreSQL 15, 16, 17 and 18 seeded from `init-db.sql`, plus empty servers for restores: one of each of 16, 17 and 18, and a PostgreSQL 18 server for the PostgreSQL 15 dump
 4. Runs every scenario and check
 5. Removes the containers
 
@@ -35,14 +35,14 @@ The runner:
 
 | Area | What is checked |
 |---|---|
-| Explicit list | Every database dumped on 17 and 18, complete and valid gzip |
-| Client selection | The metadata names the client of the server's own major version |
+| Explicit list | Every database dumped on 15, 16, 17 and 18, complete and valid gzip |
+| Client selection | The metadata names the client of the server's own major version; PostgreSQL 15, which has no client in the image, falls back to 18 and logs a warning |
 | Structure-only tables | Global and per-database patterns keep the table definition and drop its rows; a quoted table name with a space in a mixed-case database |
 | Discovery | Includes `postgres` and a mixed-case database, honours `DB_EXCLUDE_DATABASES` |
 | Combined | `ALL_DATABASES.gz` is a complete `pg_dumpall` dump with roles, without excluded databases |
 | Globals | `globals.sql.gz` contains the non-superuser role |
 | Permissions | Every snapshot file has mode `0600` |
-| Disaster recovery | Globals, then each database, into an empty server of the same major; row counts, a table owned by a non-superuser role, and data from the `pgcrypto` extension |
+| Disaster recovery | Globals, then each database, into an empty server of the same major (16, 17, 18); row counts, a table owned by a non-superuser role, and data from the `pgcrypto` extension. The PostgreSQL 15 fallback dump, into an empty PostgreSQL 18 server |
 | In-place restore | The same dumps restored again over the restored databases |
 | Rotation | Only the lowest level dumps; weekly promotes the oldest daily |
 | Failure | A missing database makes the run exit non-zero, rsnapshot rolls back, nothing rotates, and no password appears in the log |

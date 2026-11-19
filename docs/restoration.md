@@ -11,7 +11,7 @@ version: 1.x
 # Restoring Snapshots
 
 !!! warning "Test Restorations First"
-    Restore a snapshot into a scratch server as soon as the first one exists, and periodically after that. Each procedure on this page is exercised by the image's own test suite against PostgreSQL 17 and 18.
+    Restore a snapshot into a scratch server as soon as the first one exists, and periodically after that. Each procedure on this page is exercised by the image's own test suite against PostgreSQL 16, 17 and 18.
 
 ## What a Snapshot Contains
 

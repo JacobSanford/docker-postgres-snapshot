@@ -20,7 +20,7 @@ The primary goals of docker-postgres-snapshot are reliability, simplicity, and e
     Please review the [Important Considerations](important-considerations.md) document. This package has not been reviewed for all possible use cases and environments. It should be considered an example, rather than a production-ready tool. Please ensure that you audit this package and how you deploy it against your specific environment and requirements.
 
 ## Compatibility
-The image carries the PostgreSQL 17 and 18 clients and dumps each server with the client of its own major version. See [Compatibility](compatibility.md).
+The image carries the PostgreSQL 16, 17 and 18 clients and dumps each server with the client of its own major version. See [Compatibility](compatibility.md).
 
 ## Quick Navigation
 

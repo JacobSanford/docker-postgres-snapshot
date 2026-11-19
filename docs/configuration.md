@@ -50,7 +50,7 @@ Each dump is written uncompressed to the container's `/tmp` and compressed only 
 
 ## Client Selection
 
-The image carries the PostgreSQL 17 and 18 clients. Each run reads the server's version and uses the `pg_dump` of the same major version, so a dump restores into the same major version without features the server does not have. For any other server version it uses the newest client and logs a warning; a newer `pg_dump` can dump an older server. The client used is recorded in `snapshot-metadata.json`.
+The image carries the PostgreSQL 16, 17 and 18 clients. Each run reads the server's version and uses the `pg_dump` of the same major version, so a dump restores into the same major version without features the server does not have. For any other server version it uses the newest client and logs a warning; a newer `pg_dump` can dump an older server, but that dump restores cleanly only into PostgreSQL 17 or newer (see [Compatibility](compatibility.md#restoring)). The client used is recorded in `snapshot-metadata.json`.
 
 ## Database Selection Modes
 
