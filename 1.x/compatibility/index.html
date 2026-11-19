@@ -11,7 +11,7 @@
 <link href="../consistency/" rel="prev"/>
 <link href="../security/" rel="next"/>
 <link href="../assets/images/favicon.png" rel="icon"/>
-<meta content="mkdocs-1.6.1, mkdocs-material-9.8.0" name="generator"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.8.2" name="generator"/>
 <title>Compatibility - docker-postgres-snapshot</title>
 <link href="../assets/stylesheets/main.57a0d79d.min.css" rel="stylesheet"/>
 <link href="../assets/stylesheets/palette.fb2fffe2.min.css" rel="stylesheet"/>
@@ -499,11 +499,12 @@
 <article class="md-content__inner md-typeset">
 <h1 id="compatibility"><span class="enumerate-headings-plugin enumerate-heading-plugin">9.</span> Compatibility</h1>
 <h2 id="dumping"><span class="enumerate-headings-plugin enumerate-heading-plugin">9.1</span> Dumping</h2>
-<p>The image carries the PostgreSQL 17 and 18 clients and dumps each server with the client of the same major version, so the dump contains nothing the server's own version could not have produced. The test suite runs every scenario against both.</p>
-<p>A server of any other major version is dumped with the newest client, which logs a warning. <code>pg_dump</code> supports servers back to 9.2, so older servers still work; a server newer than every installed client is refused by <code>pg_dump</code> itself. The client actually used is recorded in <code>snapshot-metadata.json</code>.</p>
+<p>The image carries the PostgreSQL 16, 17 and 18 clients, the ones Alpine packages, and dumps each server with the client of the same major version, so the dump contains nothing the server's own version could not have produced. The test suite runs every scenario against 17 and 18, and dumps and restores 16.</p>
+<p>A server of any other major version is dumped with the newest client, which logs a warning. <code>pg_dump</code> supports servers back to 9.2, so an older server can still be dumped, but the dump only restores cleanly into PostgreSQL 17 or newer; see <a href="#restoring">Restoring</a>. The test suite covers this with PostgreSQL 15. A server newer than every installed client is refused by <code>pg_dump</code> itself. The client actually used is recorded in <code>snapshot-metadata.json</code>.</p>
 <p>To support another major version, add its <code>postgresqlNN-client</code> package to the <code>Dockerfile</code> and its server to the test suite.</p>
 <h2 id="restoring"><span class="enumerate-headings-plugin enumerate-heading-plugin">9.2</span> Restoring</h2>
-<p>A dump restores into a server of the same major version, which is the case the tests prove. Restoring into a newer major version is the supported PostgreSQL upgrade path. Restoring into an older one is not supported by PostgreSQL and may fail on statements the older server does not know.</p>
+<p>A dump made with the server's own client restores into a server of the same major version, which is the case the tests prove. Restoring into a newer major version is the supported PostgreSQL upgrade path. Restoring into an older one is not supported by PostgreSQL and may fail on statements the older server does not know.</p>
+<p>A dump made with the fallback client counts as coming from that newer version. A PostgreSQL 15 server's dump, made by the 18 client, contains <code>SET transaction_timeout = 0;</code>, which servers before 17 reject, so restoring it into PostgreSQL 15 with <code>ON_ERROR_STOP</code> stops at that line. Restore it into PostgreSQL 17 or newer, as the tests do, or restore it into 15 without <code>ON_ERROR_STOP</code> and check that the <code>transaction_timeout</code> error is the only one.</p>
 <p>Dumps start with <code>\restrict</code>, which <code>psql</code> gained in the August 2025 minor releases (17.6, 16.10, 15.14, 14.19, 13.22). Restore with a <code>psql</code> at least that recent; see <a href="../restoration/">Restoring Snapshots</a>.</p>
 </article>
 </div>
@@ -533,6 +534,6 @@
 <div class="md-dialog__inner md-typeset"></div>
 </div>
 <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
-<script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+<script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
 </body>
 </html>
