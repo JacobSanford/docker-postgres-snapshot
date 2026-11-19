@@ -89,6 +89,8 @@ plugins:
       raise_error_after_finish: true
       validate_external_urls: true
       validate_rendered_template: true
+      ignore_urls:
+        - 'https://rsnapshot.org*'  # DNS stopped resolving 2026-11-19
   - enumerate-headings:
       exclude:
         - index.md
